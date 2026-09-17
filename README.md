@@ -1,4 +1,49 @@
 # Generic Radio - NOS3 Component
+
+## IRIS transmit-power extension (simulator)
+
+The IRIS simulator stores transmit power as an unsigned integer in milliwatts,
+from 0 through 100 inclusive. It starts at 0 and resets to 0 on simulator
+DISABLE. For now this is a stored setting only: it does not alter simulated
+signal strength, forwarding, or link availability (including at 0 mW).
+
+All device commands remain 9 bytes: `DE AD`, one command byte, four payload
+bytes in big-endian order, then `BE EF`.
+
+| Device command | ID | Payload | Response |
+| --- | --- | --- | --- |
+| Set transmit power | `02` | Power in mW | No immediate reply; read extended HK to confirm |
+| Request extended housekeeping | `03` | Four zero bytes (ignored) | 20-byte reply below |
+
+For example, set 50 mW with `DE AD 02 00 00 00 32 BE EF`, then request
+extended HK with `DE AD 03 00 00 00 00 BE EF`. Values above 100 are rejected
+with a simulator warning; power and the command counter are unchanged.
+Accepted power commands increment the existing counter. Disabled simulators
+ignore these commands, as they do the original commands.
+
+Extended housekeeping uses this layout (offsets are zero-based):
+
+| Bytes | Field |
+| --- | --- |
+| 0–1 | Header `DE AD` |
+| 2–5 | Command counter, unsigned big-endian 32-bit |
+| 6–9 | Existing configuration, unsigned big-endian 32-bit |
+| 10–13 | Existing proximity signal, unsigned big-endian 32-bit |
+| 14–17 | Transmit power in mW, unsigned big-endian 32-bit |
+| 18–19 | Trailer `BE EF` |
+
+Command `00` still returns the original 16-byte housekeeping packet, so the
+current flight app continues to work. Flight-software and COSMOS support for
+commands `02` and `03` will be added in the next development steps. These are
+device-protocol IDs, not cFS ground-command function codes.
+
+Run the standalone power protocol checks from this component's root:
+
+```sh
+g++ -std=c++11 -Wall -Wextra -Werror -Isim/inc sim/tests/iris_radio_power_test.cpp -o /tmp/iris_radio_power_test
+/tmp/iris_radio_power_test
+```
+
 This repository contains the NOS3 Generic Radio Component.
 This includes flight software (FSW), ground software (GSW), simulation, and support directories.
 

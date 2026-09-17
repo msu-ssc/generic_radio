@@ -251,6 +251,7 @@ namespace Nos3
             _count = 0;
             _config = 0;
             _prox_signal = 0;
+            _transmit_power.reset();
             response = "Generic_radioHardwareModel::command_callback:  Disabled";
         }
         else if (command.compare(0,4,"STOP") == 0) 
@@ -1016,7 +1017,7 @@ void Generic_radioHardwareModel::forward_loop_multi(udp_info_t* rcv_sock, udp_in
     /* Protocol callback */
     void Generic_radioHardwareModel::process_radio_command(const uint8_t *buf, size_t len)
     {
-        std::uint8_t out_data[16]; 
+        std::uint8_t out_data[IrisRadioPower::POWER_HK_SIZE];
         int status = GENERIC_RADIO_SIM_SUCCESS;
         std::uint8_t valid = GENERIC_RADIO_SIM_SUCCESS;
         
@@ -1100,6 +1101,30 @@ void Generic_radioHardwareModel::forward_loop_multi(udp_info_t* rcv_sock, udp_in
                         _config |= in_data[4] << 16;
                         _config |= in_data[5] << 8;
                         _config |= in_data[6];
+                        break;
+
+                    case IrisRadioPower::SET_POWER_COMMAND:
+                        if (_transmit_power.set(&in_data[3]))
+                        {
+                            _count++;
+                            sim_logger->info("IRIS_RADIO: Transmit power set to %u mW", unsigned(in_data[6]));
+                        }
+                        else
+                        {
+                            sim_logger->warning("IRIS_RADIO: Transmit power rejected; expected 0..100 mW");
+                        }
+                        break;
+
+                    case IrisRadioPower::REQUEST_POWER_HK_COMMAND:
+                        _count++;
+                        create_generic_radio_hk(out_data);
+                        _transmit_power.extend_housekeeping(out_data);
+                        status = sendto(_radio_cmd.sockfd, out_data, sizeof(out_data), 0,
+                                        (sockaddr*) &fwd_addr, sizeof(fwd_addr));
+                        if ((status == -1) || (status != int(sizeof(out_data))))
+                        {
+                            sim_logger->debug("IRIS_RADIO: Power housekeeping sendto returned %d", status);
+                        }
                         break;
 
                     default:

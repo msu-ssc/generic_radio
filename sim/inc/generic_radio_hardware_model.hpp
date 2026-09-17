@@ -21,6 +21,7 @@
 
 #include <sim_i_data_provider.hpp>
 #include <generic_radio_data_point.hpp>
+#include <iris_radio_power.hpp>
 #include <sim_i_hardware_model.hpp>
 
 
@@ -94,6 +95,7 @@ namespace Nos3
         std::uint32_t                                       _count;
         std::uint32_t                                       _config;
         std::uint32_t                                       _prox_signal;
+        IrisRadioPower                                     _transmit_power;
         struct message_to_send_t {
             uint8_t buffer[8192];
             size_t buffer_size;

@@ -306,7 +306,7 @@ void GENERIC_RADIO_ProcessGroundCommand(void)
             {
                 /* Second, send EVS event on successful receipt ground commands*/
                 CFE_EVS_SendEvent(GENERIC_RADIO_CMD_NOOP_INF_EID, CFE_EVS_EventType_INFORMATION,
-                                  "GENERIC_RADIO: NOOP command received");
+                                  "oh heck ya NOOP command received yay!");
                 /* Third, do the desired command action if applicable, in the case of NOOP
                  * it is no operation */
             }
