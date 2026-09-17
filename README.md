@@ -1,6 +1,6 @@
 # Generic Radio - NOS3 Component
 
-## IRIS transmit-power extension (simulator)
+## IRIS transmit-power extension (simulator and device driver)
 
 The IRIS simulator stores transmit power as an unsigned integer in milliwatts,
 from 0 through 100 inclusive. It starts at 0 and resets to 0 on simulator
@@ -33,9 +33,45 @@ Extended housekeeping uses this layout (offsets are zero-based):
 | 18–19 | Trailer `BE EF` |
 
 Command `00` still returns the original 16-byte housekeeping packet, so the
-current flight app continues to work. Flight-software and COSMOS support for
-commands `02` and `03` will be added in the next development steps. These are
+current flight app continues to work. The device driver supports commands `02`
+and `03`; cFS command handlers and COSMOS controls will be added in the next
+development steps. These are
 device-protocol IDs, not cFS ground-command function codes.
+
+### Flight-software device driver
+
+`fsw/shared/generic_radio_device.h` exposes:
+
+```c
+int32_t IRIS_RADIO_SetTransmitPower(socket_info_t *device, uint32_t milliwatts);
+int32_t IRIS_RADIO_RequestPowerHK(socket_info_t *device, IRIS_RADIO_PowerHK_t *data);
+```
+
+The setter rejects values outside 0–100 before sending any bytes. Its success
+means the datagram was sent, not that the device accepted it. Read extended
+housekeeping to confirm the setting. `IRIS_RADIO_PowerHK_t` contains
+`DeviceCounter`, `DeviceConfig`, `ProxSignal`, and `TransmitPowerMilliwatts` as
+host-order unsigned 32-bit values.
+
+The reader sends command `03`, waits the configured device delay, and reads one
+reply. It rejects socket errors, wrong lengths (including legacy 16-byte HK),
+invalid headers/trailers, and out-of-range power. On failure, the caller's
+output structure is unchanged. Transport errors are returned to the caller;
+invalid arguments or packets return `OS_ERROR`.
+
+Use these functions from the app's existing serialized device-access path:
+do not run legacy and extended HK requests concurrently on the same socket.
+The protocol has no transaction ID to match overlapping requests.
+
+Run the driver tests from the component root:
+
+```sh
+bash fsw/shared/tests/run.sh
+```
+
+These compile the actual C driver with a mock transport and exercise its
+exchange with the simulator's power-state encoder, plus malformed packets and
+transport failures. They do not launch the networked simulator.
 
 Run the standalone power protocol checks from this component's root:
 

@@ -11,6 +11,82 @@
 */
 #include "generic_radio_device.h"
 
+/* Decode network byte order without signed shifts or alignment assumptions. */
+static uint32_t IRIS_RADIO_ReadUint32(const uint8_t *bytes)
+{
+    return ((uint32_t)bytes[0] << 24) | ((uint32_t)bytes[1] << 16) |
+           ((uint32_t)bytes[2] << 8) | (uint32_t)bytes[3];
+}
+
+int32_t IRIS_RADIO_SetTransmitPower(socket_info_t *device, uint32_t milliwatts)
+{
+    uint8_t command[GENERIC_RADIO_DEVICE_CMD_SIZE] = {
+        GENERIC_RADIO_DEVICE_HDR_0, GENERIC_RADIO_DEVICE_HDR_1,
+        IRIS_RADIO_DEVICE_SET_POWER_CMD, 0, 0, 0, 0,
+        GENERIC_RADIO_DEVICE_TRAILER_0, GENERIC_RADIO_DEVICE_TRAILER_1
+    };
+    size_t bytes_sent = 0;
+    int32_t status;
+
+    if (device == NULL || milliwatts > IRIS_RADIO_MAX_POWER_MW)
+        return OS_ERROR;
+
+    command[3] = (uint8_t)(milliwatts >> 24);
+    command[4] = (uint8_t)(milliwatts >> 16);
+    command[5] = (uint8_t)(milliwatts >> 8);
+    command[6] = (uint8_t)milliwatts;
+    status = socket_send(device, command, sizeof(command), &bytes_sent,
+                         GENERIC_RADIO_CFG_DEVICE_IP, GENERIC_RADIO_CFG_UDP_FSW_TO_RADIO);
+    if (status != OS_SUCCESS)
+        return status;
+    return bytes_sent == sizeof(command) ? OS_SUCCESS : OS_ERROR;
+}
+
+int32_t IRIS_RADIO_RequestPowerHK(socket_info_t *device, IRIS_RADIO_PowerHK_t *data)
+{
+    uint8_t command[GENERIC_RADIO_DEVICE_CMD_SIZE] = {
+        GENERIC_RADIO_DEVICE_HDR_0, GENERIC_RADIO_DEVICE_HDR_1,
+        IRIS_RADIO_DEVICE_REQ_POWER_HK_CMD, 0, 0, 0, 0,
+        GENERIC_RADIO_DEVICE_TRAILER_0, GENERIC_RADIO_DEVICE_TRAILER_1
+    };
+    /* An extra byte lets us reject oversized UDP replies rather than accept
+     * a valid-looking 20-byte prefix of a truncated datagram. */
+    uint8_t reply[IRIS_RADIO_POWER_HK_SIZE + 1] = {0};
+    IRIS_RADIO_PowerHK_t decoded;
+    size_t bytes = 0;
+    int32_t status;
+
+    if (device == NULL || data == NULL)
+        return OS_ERROR;
+
+    status = socket_send(device, command, sizeof(command), &bytes,
+                         GENERIC_RADIO_CFG_DEVICE_IP, GENERIC_RADIO_CFG_UDP_FSW_TO_RADIO);
+    if (status != OS_SUCCESS)
+        return status;
+    if (bytes != sizeof(command))
+        return OS_ERROR;
+
+    OS_TaskDelay(GENERIC_RADIO_CFG_DEVICE_DELAY_MS);
+    bytes = 0;
+    status = socket_recv(device, reply, sizeof(reply), &bytes);
+    if (status != OS_SUCCESS)
+        return status;
+    if (bytes != IRIS_RADIO_POWER_HK_SIZE ||
+        reply[0] != GENERIC_RADIO_DEVICE_HDR_0 || reply[1] != GENERIC_RADIO_DEVICE_HDR_1 ||
+        reply[18] != GENERIC_RADIO_DEVICE_TRAILER_0 || reply[19] != GENERIC_RADIO_DEVICE_TRAILER_1)
+        return OS_ERROR;
+
+    decoded.DeviceCounter = IRIS_RADIO_ReadUint32(&reply[2]);
+    decoded.DeviceConfig = IRIS_RADIO_ReadUint32(&reply[6]);
+    decoded.ProxSignal = IRIS_RADIO_ReadUint32(&reply[10]);
+    decoded.TransmitPowerMilliwatts = IRIS_RADIO_ReadUint32(&reply[14]);
+    if (decoded.TransmitPowerMilliwatts > IRIS_RADIO_MAX_POWER_MW)
+        return OS_ERROR;
+
+    *data = decoded;
+    return OS_SUCCESS;
+}
+
 /*
 ** Set Configuration
 */
