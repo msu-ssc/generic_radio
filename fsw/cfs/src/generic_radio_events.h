@@ -26,6 +26,9 @@
 
 /* Device specific command event IDs */
 #define GENERIC_RADIO_CMD_CONFIG_INF_EID 20
+#define IRIS_RADIO_SET_POWER_INF_EID     21
+#define IRIS_RADIO_POWER_RANGE_ERR_EID   22
+#define IRIS_RADIO_POWER_SEND_ERR_EID    23
 
 /* Standard telemetry event IDs */
 #define GENERIC_RADIO_DEVICE_TLM_ERR_EID 30

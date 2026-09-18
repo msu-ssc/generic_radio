@@ -30,6 +30,12 @@
         <xtce:IntegerParameterType name="PROXIMITY_SIGNAL_Type" shortDescription="Proxmity Signal Strength" signed="false">
           <xtce:IntegerDataEncoding sizeInBits="32" encoding="unsigned" byteOrder="leastSignificantByteFirst"/>
         </xtce:IntegerParameterType>
+        <xtce:IntegerParameterType name="TRANSMIT_POWER_MW_Type" signed="false">
+          <xtce:IntegerDataEncoding sizeInBits="32" encoding="unsigned" byteOrder="leastSignificantByteFirst"/>
+        </xtce:IntegerParameterType>
+        <xtce:IntegerParameterType name="POWER_VALID_Type" signed="false">
+          <xtce:IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        </xtce:IntegerParameterType>
       </xtce:ParameterTypeSet>
       <xtce:ParameterSet>
         <xtce:Parameter name="CMD_ERR_COUNT" parameterTypeRef="CMD_ERR_COUNT_Type"/>
@@ -40,6 +46,8 @@
         <xtce:Parameter name="DEVICE_COUNTER" parameterTypeRef="DEVICE_COUNTER_Type"/>
         <xtce:Parameter name="DEVICE_CONFIG" parameterTypeRef="DEVICE_CONFIG_Type"/>
         <xtce:Parameter name="PROXIMITY_SIGNAL" parameterTypeRef="PROXIMITY_SIGNAL_Type"/>
+        <xtce:Parameter name="TRANSMIT_POWER_MW" parameterTypeRef="TRANSMIT_POWER_MW_Type"/>
+        <xtce:Parameter name="POWER_VALID" parameterTypeRef="POWER_VALID_Type"/>
       </xtce:ParameterSet>
       <xtce:ContainerSet>
         <xtce:SequenceContainer name="GENERIC_RADIO_HK_TLM" shortDescription="GENERIC_RADIO_Hk_tlm_t">
@@ -52,6 +60,8 @@
             <xtce:ParameterRefEntry parameterRef="DEVICE_COUNTER"/>
             <xtce:ParameterRefEntry parameterRef="DEVICE_CONFIG"/>
             <xtce:ParameterRefEntry parameterRef="PROXIMITY_SIGNAL"/>
+            <xtce:ParameterRefEntry parameterRef="TRANSMIT_POWER_MW"/>
+            <xtce:ParameterRefEntry parameterRef="POWER_VALID"/>
           </xtce:EntryList>
           <xtce:BaseContainer containerRef="/CCSDS/CCSDS_TM">
             <xtce:RestrictionCriteria>
@@ -81,6 +91,10 @@
         <xtce:IntegerArgumentType name="DEVICE_CONFIG_Type" initialValue="0" shortDescription="Device Configuration" signed="false">
           <xtce:IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
           <xtce:ValidRange minInclusive="0" maxInclusive="4294967295"/>
+        </xtce:IntegerArgumentType>
+        <xtce:IntegerArgumentType name="MILLIWATTS_Type" initialValue="0" signed="false">
+          <xtce:IntegerDataEncoding sizeInBits="32" encoding="unsigned" byteOrder="leastSignificantByteFirst"/>
+          <xtce:ValidRange minInclusive="0" maxInclusive="100"/>
         </xtce:IntegerArgumentType>
       </xtce:ArgumentTypeSet>
       <xtce:MetaCommandSet>
@@ -152,6 +166,22 @@
           <xtce:ArgumentList/>
           <xtce:CommandContainer name="GENERIC_RADIO_GENERIC_RADIO_NOOP_CC_CommandContainer">
             <xtce:EntryList/>
+          </xtce:CommandContainer>
+        </xtce:MetaCommand>
+        <xtce:MetaCommand name="IRIS_RADIO_SET_POWER">
+          <xtce:BaseMetaCommand metaCommandRef="/CCSDS/CCSDS_TC">
+            <xtce:ArgumentAssignmentList>
+              <xtce:ArgumentAssignment argumentName="CCSDS_STREAMID" argumentValue="6448"/>
+              <xtce:ArgumentAssignment argumentName="CCSDS_FC" argumentValue="4"/>
+            </xtce:ArgumentAssignmentList>
+          </xtce:BaseMetaCommand>
+          <xtce:ArgumentList>
+            <xtce:Argument name="MILLIWATTS" argumentTypeRef="MILLIWATTS_Type"/>
+          </xtce:ArgumentList>
+          <xtce:CommandContainer name="IRIS_RADIO_SET_POWER_CommandContainer">
+            <xtce:EntryList>
+              <xtce:ArgumentRefEntry argumentRef="MILLIWATTS"/>
+            </xtce:EntryList>
           </xtce:CommandContainer>
         </xtce:MetaCommand>
       </xtce:MetaCommandSet>

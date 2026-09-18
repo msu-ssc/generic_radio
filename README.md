@@ -1,6 +1,6 @@
 # Generic Radio - NOS3 Component
 
-## IRIS transmit-power extension (simulator and device driver)
+## IRIS transmit-power feature
 
 The IRIS simulator stores transmit power as an unsigned integer in milliwatts,
 from 0 through 100 inclusive. It starts at 0 and resets to 0 on simulator
@@ -33,10 +33,52 @@ Extended housekeeping uses this layout (offsets are zero-based):
 | 18–19 | Trailer `BE EF` |
 
 Command `00` still returns the original 16-byte housekeeping packet, so the
-current flight app continues to work. The device driver supports commands `02`
-and `03`; cFS command handlers and COSMOS controls will be added in the next
-development steps. These are
-device-protocol IDs, not cFS ground-command function codes.
+legacy device clients continue to work. The IRIS cFS app now requests command
+`03` for its regular housekeeping. Device-protocol IDs are separate from cFS
+ground-command function codes: the new ground command uses function code `4`.
+
+### Use from COSMOS
+
+Rebuild flight software and simulators, refresh ground definitions, and restart
+NOS3 and COSMOS after this update. The cFS housekeeping packet grew from 33 to
+38 bytes, so old ground definitions must not be used with the new app.
+
+1. In Command Sender, select target `GENERIC_RADIO` (or `GENERIC_RADIO_RADIO`
+   when using the radio route).
+2. Select command `IRIS_RADIO_SET_POWER` and set `MILLIWATTS` to 50.
+3. Send the command. Event 21 reports that the setting was sent; this alone
+   does not confirm device acceptance.
+4. Send `GENERIC_RADIO_REQ_HK`, or wait for scheduled housekeeping.
+5. In Packet Viewer, select the same target and packet `GENERIC_RADIO_HK_TLM`.
+   Check `TRANSMIT_POWER_MW == 50` and `POWER_VALID == 1`. The new `power` screen
+   in Telemetry Viewer displays these fields too.
+
+Power telemetry comes from the simulator's reply, not the requested command
+value. A send or failed housekeeping read clears `POWER_VALID`; an unsuccessful
+read retains the last reported power. Always check packet freshness as well as
+`POWER_VALID`: no new telemetry means even the validity flag can be stale.
+Reset-counters does not change device power and clears validity until fresh HK.
+
+COSMOS restricts power to 0–100. cFS also validates it: out-of-range commands
+produce event 22 and increment `CMD_ERR_COUNT`, without incrementing `CMD_COUNT`
+or sending a device command. Send failures produce event 23 and increment both
+command and device error counts. Wrong command lengths produce the existing
+length-error event. Accepted sends increment `CMD_COUNT`.
+
+The telemetry fields are appended after the original fields: power is a
+32-bit host-order value at byte 33 and validity is an 8-bit value at byte 37
+in this NOS3 cFS build. COSMOS/OpenC3 definitions and Yamcs XTCE are updated.
+This feature is for cFS; the separate F Prime application is not updated.
+
+### Required NOS3 hardware-library fix
+
+Runtime testing found the NOS hwlib UDP sender used `addr_fam_e` (IPv4 is 0)
+as a POSIX socket family instead of `AF_INET` (2). The fix in
+`fsw/apps/hwlib/sim/src/libsocket.c` belongs to the **separate hwlib submodule**
+of the parent NOS3 repository. Keep that fix with this integration; without
+it, radio sends fail. Publishing the complete integration requires publishing
+that hwlib commit to `https://github.com/msu-ssc/hwlib.git` and recording its
+commit in NOS3, as well as the IRIS radio commit. NOS3 now uses that MSU fork.
 
 ### Flight-software device driver
 

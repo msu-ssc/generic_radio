@@ -19,6 +19,7 @@
 #define GENERIC_RADIO_RESET_COUNTERS_CC 1
 #define GENERIC_RADIO_CONFIG_CC         2
 #define GENERIC_RADIO_PROXIMITY_CC      3
+#define IRIS_RADIO_SET_POWER_CC         4
 
 /*
 ** Telemetry Request Command Codes
@@ -45,6 +46,12 @@ typedef struct
 
 } GENERIC_RADIO_Config_cmd_t;
 
+typedef struct
+{
+    CFE_MSG_CommandHeader_t CmdHeader;
+    uint32 Milliwatts;
+} IRIS_RADIO_SetPower_cmd_t;
+
 /*
 ** GENERIC_RADIO proximity forward command
 */
@@ -68,6 +75,8 @@ typedef struct
     uint8                         ForwardErrorCount;
     uint8                         ForwardCount;
     GENERIC_RADIO_Device_HK_tlm_t DeviceHK;
+    uint32 TransmitPowerMilliwatts; /* Last device-reported value */
+    uint8 PowerValid; /* 1 only when the latest HK read succeeded */
 
 } __attribute__((packed)) GENERIC_RADIO_Hk_tlm_t;
 #define GENERIC_RADIO_HK_TLM_LNGTH sizeof(GENERIC_RADIO_Hk_tlm_t)

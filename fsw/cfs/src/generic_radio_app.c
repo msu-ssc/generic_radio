@@ -329,6 +329,41 @@ void GENERIC_RADIO_ProcessGroundCommand(void)
         ** Set Configuration Command
         ** Note that this is an example of a command that has additional arguments
         */
+        case IRIS_RADIO_SET_POWER_CC:
+            if (GENERIC_RADIO_VerifyCmdLength(GENERIC_RADIO_AppData.MsgPtr,
+                                             sizeof(IRIS_RADIO_SetPower_cmd_t)) == OS_SUCCESS)
+            {
+                uint32 milliwatts = ((IRIS_RADIO_SetPower_cmd_t *)GENERIC_RADIO_AppData.MsgPtr)->Milliwatts;
+                if (milliwatts > IRIS_RADIO_MAX_POWER_MW)
+                {
+                    /* Length verification counted this command; reject its argument. */
+                    GENERIC_RADIO_AppData.HkTelemetryPkt.CommandCount--;
+                    GENERIC_RADIO_AppData.HkTelemetryPkt.CommandErrorCount++;
+                    CFE_EVS_SendEvent(IRIS_RADIO_POWER_RANGE_ERR_EID, CFE_EVS_EventType_ERROR,
+                                      "IRIS_RADIO: Power %lu mW rejected; expected 0..100",
+                                      (unsigned long)milliwatts);
+                    break;
+                }
+                status = IRIS_RADIO_SetTransmitPower(&GENERIC_RADIO_AppData.RadioSocket, milliwatts);
+                /* A send is not confirmation. Wait for fresh device housekeeping. */
+                GENERIC_RADIO_AppData.HkTelemetryPkt.PowerValid = 0;
+                if (status == OS_SUCCESS)
+                {
+                    CFE_EVS_SendEvent(IRIS_RADIO_SET_POWER_INF_EID, CFE_EVS_EventType_INFORMATION,
+                                      "IRIS_RADIO: Sent power setting %lu mW; awaiting device HK",
+                                      (unsigned long)milliwatts);
+                }
+                else
+                {
+                    GENERIC_RADIO_AppData.HkTelemetryPkt.CommandCount--;
+                    GENERIC_RADIO_AppData.HkTelemetryPkt.CommandErrorCount++;
+                    GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceErrorCount++;
+                    CFE_EVS_SendEvent(IRIS_RADIO_POWER_SEND_ERR_EID, CFE_EVS_EventType_ERROR,
+                                      "IRIS_RADIO: Power command send failed: %ld", (long)status);
+                }
+            }
+            break;
+
         case GENERIC_RADIO_CONFIG_CC:
             if (GENERIC_RADIO_VerifyCmdLength(GENERIC_RADIO_AppData.MsgPtr, sizeof(GENERIC_RADIO_Config_cmd_t)) ==
                 OS_SUCCESS)
@@ -429,11 +464,15 @@ void GENERIC_RADIO_ReportHousekeeping(void)
 {
     int32 status = OS_SUCCESS;
 
-    status = GENERIC_RADIO_RequestHK(&GENERIC_RADIO_AppData.RadioSocket,
-                                     (GENERIC_RADIO_Device_HK_tlm_t *)&GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK);
+    IRIS_RADIO_PowerHK_t device_hk;
+    status = IRIS_RADIO_RequestPowerHK(&GENERIC_RADIO_AppData.RadioSocket, &device_hk);
+    GENERIC_RADIO_AppData.HkTelemetryPkt.PowerValid = (status == OS_SUCCESS);
     if (status == OS_SUCCESS)
     {
-        GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK.DeviceCounter++;
+        GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK.DeviceCounter = device_hk.DeviceCounter;
+        GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK.DeviceConfig = device_hk.DeviceConfig;
+        GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK.ProxSignal = device_hk.ProxSignal;
+        GENERIC_RADIO_AppData.HkTelemetryPkt.TransmitPowerMilliwatts = device_hk.TransmitPowerMilliwatts;
     }
     else
     {
@@ -461,6 +500,7 @@ void GENERIC_RADIO_ResetCounters(void)
     GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK.DeviceCounter = 0;
     GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK.DeviceConfig  = 0;
     GENERIC_RADIO_AppData.HkTelemetryPkt.DeviceHK.ProxSignal    = 0;
+    GENERIC_RADIO_AppData.HkTelemetryPkt.PowerValid = 0;
     return;
 }
 
